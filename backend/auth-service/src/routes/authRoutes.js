@@ -1,12 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const passport = require('../config/passport-saml');
+const { passport, samlEnabled } = require('../config/passport-saml');
 const { findUserByEmail, createLocalUser } = require('../models/userModel');
 
 const router = express.Router();
 
-// ---- Local registration ----
 router.post('/register', async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
@@ -27,7 +26,6 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ---- Local login ----
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -53,12 +51,23 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ---- SAML SSO ----
-router.get('/saml/login', passport.authenticate('saml', { failureRedirect: '/api/auth/saml/failure' }));
+router.get('/saml/login', (req, res, next) => {
+  if (!samlEnabled) {
+    return res.status(503).json({
+      message: 'SAML is not configured yet. Provide a valid IdP certificate at SAML_CERT_PATH.',
+    });
+  }
+  return passport.authenticate('saml', { failureRedirect: '/api/auth/saml/failure' })(req, res, next);
+});
 
 router.post(
   '/saml/callback',
-  passport.authenticate('saml', { failureRedirect: '/api/auth/saml/failure', session: false }),
+  (req, res, next) => {
+    if (!samlEnabled) {
+      return res.status(503).json({ message: 'SAML is not configured yet.' });
+    }
+    return passport.authenticate('saml', { failureRedirect: '/api/auth/saml/failure', session: false })(req, res, next);
+  },
   (req, res) => {
     const user = req.user;
     const token = jwt.sign(
