@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: clicolab_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - auth-service
+    networks:
+      - clicolab_net
+
+  frontend:
+    build: ./frontend
+    container_name: clicolab_frontend
+    environment:
+      - VITE_API_URL=/api/auth
+    networks:
+      - clicolab_net
+
+  auth-service:
+    build: ./backend/auth-service
+    container_name: clicolab_auth_service
+    env_file:
+      - ./backend/auth-service/.env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - clicolab_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: clicolab_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clicolab
+      POSTGRES_PASSWORD: clicolab_secret
+      POSTGRES_DB: clicolab_demo_bank
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - clicolab_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: clicolab_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - clicolab_net
+
+volumes:
+  pgdata:
+
+networks:
+  clicolab_net:
+    driver: bridge
