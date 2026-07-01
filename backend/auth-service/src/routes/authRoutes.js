@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { passport, samlEnabled } = require('../config/passport-saml');
 const { findUserByEmail, createLocalUser } = require('../models/userModel');
+const { verifyToken } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -49,6 +50,17 @@ router.post('/login', async (req, res) => {
     console.error(err);
     return res.status(500).json({ message: 'Internal server error' });
   }
+});
+
+// ---- Current user (used by Dashboard to display greeting) ----
+router.get('/me', verifyToken, (req, res) => {
+  const { sub, email, fullName, provider } = req.user;
+  return res.json({
+    id: sub,
+    email,
+    fullName,
+    provider: provider || 'local',
+  });
 });
 
 router.get('/saml/login', (req, res, next) => {
