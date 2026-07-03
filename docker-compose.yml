@@ -19,6 +19,7 @@ services:
     container_name: clicolab_frontend
     environment:
       - VITE_API_URL=/api/auth
+      - VITE_CURRENCY_API_URL=/api/currency
     networks:
       - clicolab_net
 
