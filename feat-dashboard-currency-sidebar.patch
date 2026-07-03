@@ -1,0 +1,212 @@
+diff --git a/frontend/src/components/CurrencyWidget.jsx b/frontend/src/components/CurrencyWidget.jsx
+index ccb7c36..5404107 100644
+--- a/frontend/src/components/CurrencyWidget.jsx
++++ b/frontend/src/components/CurrencyWidget.jsx
+@@ -22,7 +22,7 @@ export default function CurrencyWidget() {
+   const [current, setCurrent] = useState(null);
+   const [history, setHistory] = useState([]);
+   const [loading, setLoading] = useState(true);
+-  const [error, setError] = useState('');
++  const [unavailable, setUnavailable] = useState(false);
+ 
+   const today = new Date().toLocaleDateString('pl-PL', {
+     weekday: 'long',
+@@ -32,12 +32,15 @@ export default function CurrencyWidget() {
+   });
+ 
+   useEffect(() => {
++    let isMounted = true;
++
+     async function fetchData() {
+       try {
+         const [currentData, historyData] = await Promise.all([
+           getCurrentRates(),
+           getRateHistory(),
+         ]);
++        if (!isMounted) return;
+         setCurrent(currentData);
+         setHistory(
+           historyData.map((h) => ({
+@@ -46,61 +49,69 @@ export default function CurrencyWidget() {
+           }))
+         );
+       } catch (err) {
+-        setError('Nie udalo sie pobrac kursow walut z NBP');
++        // CLICOLAB-APP-CURRENCY is an independent service on another host.
++        // If it is unreachable, fail silently - render nothing instead of
++        // showing an error box on the dashboard.
++        if (isMounted) setUnavailable(true);
+       } finally {
+-        setLoading(false);
++        if (isMounted) setLoading(false);
+       }
+     }
++
+     fetchData();
++    return () => {
++      isMounted = false;
++    };
+   }, []);
+ 
+-  return (
+-    <div className="bg-white rounded-2xl shadow p-6 mt-6">
+-      <div className="flex items-center justify-between mb-4">
+-        <h3 className="text-lg font-bold text-clicolab-dark">Kursy walut (NBP)</h3>
+-        <span className="text-sm text-gray-400 capitalize">{today}</span>
++  if (loading) {
++    return (
++      <div className="bg-white rounded-2xl shadow p-6">
++        <p className="text-sm text-gray-400">Wczytywanie kursow...</p>
+       </div>
++    );
++  }
+ 
+-      {loading && <p className="text-sm text-gray-500">Wczytywanie kursow...</p>}
+-      {error && <p className="text-sm text-red-600">{error}</p>}
++  if (unavailable || !current) {
++    return null;
++  }
+ 
+-      {!loading && !error && current && (
+-        <>
+-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+-            <div className="bg-blue-50 rounded-xl p-5">
+-              <p className="text-sm text-gray-500">USD / PLN</p>
+-              <p className="text-2xl font-bold text-clicolab-dark mt-1">
+-                {current.usd.rate.toFixed(4)} PLN
+-              </p>
+-              <p className="text-xs text-gray-400 mt-1">Tabela NBP nr {current.usd.no}</p>
+-            </div>
+-            <div className="bg-green-50 rounded-xl p-5">
+-              <p className="text-sm text-gray-500">EUR / PLN</p>
+-              <p className="text-2xl font-bold text-clicolab-dark mt-1">
+-                {current.eur.rate.toFixed(4)} PLN
+-              </p>
+-              <p className="text-xs text-gray-400 mt-1">Tabela NBP nr {current.eur.no}</p>
+-            </div>
+-          </div>
++  return (
++    <div className="bg-white rounded-2xl shadow p-6">
++      <div className="flex items-center justify-between mb-4">
++        <h3 className="text-base font-bold text-clicolab-dark">Kursy walut (NBP)</h3>
++      </div>
++      <p className="text-xs text-gray-400 capitalize mb-4">{today}</p>
+ 
+-          <div className="h-64">
+-            <ResponsiveContainer width="100%" height="100%">
+-              <LineChart data={history} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+-                <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+-                <YAxis tick={{ fontSize: 12 }} domain={['auto', 'auto']} />
+-                <Tooltip />
+-                <Legend />
+-                <Line type="monotone" dataKey="usd" name="USD" stroke="#0F62FE" strokeWidth={2} dot={{ r: 3 }} />
+-                <Line type="monotone" dataKey="eur" name="EUR" stroke="#22C55E" strokeWidth={2} dot={{ r: 3 }} />
+-              </LineChart>
+-            </ResponsiveContainer>
+-          </div>
+-          <p className="text-xs text-gray-400 mt-2">
+-            Kurs sredni NBP z ostatnich 7 dni notowan (dni robocze).
++      <div className="grid grid-cols-2 gap-3 mb-5">
++        <div className="bg-blue-50 rounded-xl p-4">
++          <p className="text-xs text-gray-500">USD / PLN</p>
++          <p className="text-xl font-bold text-clicolab-dark mt-1">
++            {current.usd.rate.toFixed(4)}
++          </p>
++        </div>
++        <div className="bg-green-50 rounded-xl p-4">
++          <p className="text-xs text-gray-500">EUR / PLN</p>
++          <p className="text-xl font-bold text-clicolab-dark mt-1">
++            {current.eur.rate.toFixed(4)}
+           </p>
+-        </>
+-      )}
++        </div>
++      </div>
++
++      <div className="h-56">
++        <ResponsiveContainer width="100%" height="100%">
++          <LineChart data={history} margin={{ top: 5, right: 10, bottom: 5, left: -20 }}>
++            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
++            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
++            <YAxis tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
++            <Tooltip />
++            <Legend wrapperStyle={{ fontSize: 12 }} />
++            <Line type="monotone" dataKey="usd" name="USD" stroke="#0F62FE" strokeWidth={2} dot={{ r: 2 }} />
++            <Line type="monotone" dataKey="eur" name="EUR" stroke="#22C55E" strokeWidth={2} dot={{ r: 2 }} />
++          </LineChart>
++        </ResponsiveContainer>
++      </div>
++      <p className="text-xs text-gray-400 mt-2">Kurs sredni NBP, ostatnie 7 dni notowan.</p>
+     </div>
+   );
+ }
+diff --git a/frontend/src/pages/DashboardPage.jsx b/frontend/src/pages/DashboardPage.jsx
+index 535e5e7..0390b91 100644
+--- a/frontend/src/pages/DashboardPage.jsx
++++ b/frontend/src/pages/DashboardPage.jsx
+@@ -60,33 +60,41 @@ export default function DashboardPage() {
+         </button>
+       </nav>
+ 
+-      <main className="max-w-5xl mx-auto px-6 py-10">
+-        <div className="bg-white rounded-2xl shadow p-8">
+-          <h2 className="text-2xl font-bold text-clicolab-dark mb-2">
+-            Witaj {displayName} w demo Bank CLICOLAB
+-          </h2>
+-          <p className="text-gray-500 text-sm">
+-            Zalogowano jako <span className="font-medium">{user?.email}</span>{' '}
+-            ({user?.provider === 'saml' ? 'logowanie SSO / SAML' : 'logowanie lokalne'})
+-          </p>
++      <main className="max-w-6xl mx-auto px-6 py-10">
++        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
++          {/* Main content column - 2/3 width */}
++          <div className="lg:col-span-2">
++            <div className="bg-white rounded-2xl shadow p-8">
++              <h2 className="text-2xl font-bold text-clicolab-dark mb-2">
++                Witaj {displayName} w demo Bank CLICOLAB
++              </h2>
++              <p className="text-gray-500 text-sm">
++                Zalogowano jako <span className="font-medium">{user?.email}</span>{' '}
++                ({user?.provider === 'saml' ? 'logowanie SSO / SAML' : 'logowanie lokalne'})
++              </p>
+ 
+-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+-            <div className="bg-blue-50 rounded-xl p-5">
+-              <p className="text-sm text-gray-500">Saldo konta</p>
+-              <p className="text-2xl font-bold text-clicolab-dark mt-1">12 480,50 PLN</p>
+-            </div>
+-            <div className="bg-green-50 rounded-xl p-5">
+-              <p className="text-sm text-gray-500">Ostatnia transakcja</p>
+-              <p className="text-2xl font-bold text-clicolab-dark mt-1">-320,00 PLN</p>
+-            </div>
+-            <div className="bg-purple-50 rounded-xl p-5">
+-              <p className="text-sm text-gray-500">Status konta</p>
+-              <p className="text-2xl font-bold text-green-600 mt-1">Aktywne</p>
++              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
++                <div className="bg-blue-50 rounded-xl p-5">
++                  <p className="text-sm text-gray-500">Saldo konta</p>
++                  <p className="text-2xl font-bold text-clicolab-dark mt-1">12 480,50 PLN</p>
++                </div>
++                <div className="bg-green-50 rounded-xl p-5">
++                  <p className="text-sm text-gray-500">Ostatnia transakcja</p>
++                  <p className="text-2xl font-bold text-clicolab-dark mt-1">-320,00 PLN</p>
++                </div>
++                <div className="bg-purple-50 rounded-xl p-5">
++                  <p className="text-sm text-gray-500">Status konta</p>
++                  <p className="text-2xl font-bold text-green-600 mt-1">Aktywne</p>
++                </div>
++              </div>
+             </div>
+           </div>
+-        </div>
+ 
+-        <CurrencyWidget />
++          {/* Sidebar column - 1/3 width - currency widget (renders nothing if API is down) */}
++          <div className="lg:col-span-1">
++            <CurrencyWidget />
++          </div>
++        </div>
+       </main>
+     </div>
+   );
